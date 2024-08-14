@@ -1,0 +1,20 @@
+haifa
+london
+paris
+bangkok
+delhi
+seoul
+miami
+mecca
+milan
+moscow
+casablanca
+mexico city
+honolulu
+san francisco
+lisbon
+toronto
+johannesburg
+munich
+sydney
+jerusalem
