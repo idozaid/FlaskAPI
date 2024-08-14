@@ -1,33 +1,30 @@
 from flask import Flask, request
-import requests
 from dataclasses import dataclass
 import os
 import json
-
 import aiohttp
-
-
-
 import asyncio
 
 app = Flask(__name__)
 
 API_KEY = os.getenv('WEATHER_API_KEY')
-CITY_LIST_FILE_PATH = 'C:\\Users\\Administrator\\Desktop\\Ido\\Training\\FlaskAPI\\city_list.txt'
-# CITY_LIST_FILE_PATH = 'city_list.txt'
+CITY_LIST_FILE_PATH = 'C:\\Users\\Administrator\\Desktop\\Ido\\Training\\FlaskAPI\\FlaskAPI\\city_list.txt'
+
+# Initialize cities dict from file
+cities_dict = {city: City(city) for city in open(CITY_LIST_FILE_PATH).read().split('\n')}
 
 WEATHER_API_URL = 'https://api.openweathermap.org/data/2.5/weather'
 
 
 def success(info=None):
     if info:
-        print(info)
         return {'Success': True} | info
     else:
         return {'Success': True}
 
 def failure(reason: str):
     return {'Success': False, 'Reason': reason}
+
 
 @dataclass
 class City:
@@ -40,39 +37,19 @@ class City:
         
         if self.name in overridden_dict:
             return overridden_dict.get(self.name)
-        # elif is_async:
+
         async with aiohttp.ClientSession() as session:
             async with session.get(WEATHER_API_URL, params=url_params) as result:
                 return (await result.json())['main']['temp']
-        # else:
-        #     with requests.get(WEATHER_API_URL, url_params) as result:
-        #         print(type(result.json()['main']['temp']))
-        #         return result.json()['main']['temp']
 
 
     @temp.setter
     def temp(self, temp):
         self.temp = temp
 
-    def to_dict(self):
-        return {self.name: self.temp}
 
-
-# Initialize cities dict from file
-cities_dict = {city: City(city) for city in open(CITY_LIST_FILE_PATH).read().split('\n')}
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class OverriddenCitiesFile(metaclass=Singleton):
-    file_path = 'C:\\Users\\Administrator\\Desktop\\Ido\\Training\\FlaskAPI\\overridden.json'
+class OverriddenCitiesFile():
+    file_path = 'C:\\Users\\Administrator\\Desktop\\Ido\\Training\\FlaskAPI\\FlaskAPI\\overridden.json'
 
     def __contains__(self, item):
         if item in self.get_city_dict().keys():
@@ -130,10 +107,12 @@ async def get_coldest():
 
 
 @app.route("/weather/warmest/", methods=['GET'])
-def get_warmest():
-    warmest_city = max(cities_dict.values(), key=lambda city: city.temp)
+async def get_warmest():
+    name_list = [city.name for city in cities_dict.values()]
+    temp_list = await asyncio.gather(*[city.temp for city in cities_dict.values()])
 
-    return success(warmest_city.to_dict())
+    city_list = [{name: temp} for (name, temp) in zip(name_list, temp_list)]
+    return max(city_list, key=lambda city: list(city.values())[0])
 
 
 @app.route("/weather/overrides/<city_name>/create/", methods=['POST'])
@@ -167,14 +146,6 @@ def delete_override(city_name: str):
         return success()
     else:
         return failure('City did not overridden')
-
-
-@app.route("/weather/city/<city_name>/", methods=['GET'])
-def get_by_name(city_name: str):
-    if city_name in cities_dict.keys():
-        return success(cities_dict[city_name].to_dict())
-    else:
-        return failure('City not in list')
 
 
 async def main():
